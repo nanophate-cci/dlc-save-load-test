@@ -1,78 +1,54 @@
 version: 2.1
 
 jobs:
-  # Approach A: docker save/load — skip build entirely if image hasn't changed
-  approach-a-save-load:
+  check-storage-driver:
     machine:
       image: ubuntu-2204:2026.05.1
       docker_layer_caching: false
     steps:
-      - checkout
       - run:
-          name: Docker version
-          command: docker version --format '{{.Server.Version}}'
-      - restore_cache:
-          keys:
-            - save-load-v1-{{ checksum "Dockerfile" }}
-      - run:
-          name: Load or Build
+          name: Docker info - storage driver
           command: |
-            if [ -f /tmp/docker-cache/image.tar ]; then
-              echo ">>> CACHE HIT — loading saved image, skipping build"
-              time docker load < /tmp/docker-cache/image.tar
-              docker images dlc-test
-            else
-              echo ">>> CACHE MISS — building from scratch"
-              time docker build -t dlc-test:latest .
-              mkdir -p /tmp/docker-cache
-              echo ">>> Saving image to tar"
-              time docker save dlc-test:latest > /tmp/docker-cache/image.tar
-              ls -lh /tmp/docker-cache/image.tar
-            fi
-      - save_cache:
-          key: save-load-v1-{{ checksum "Dockerfile" }}
-          paths:
-            - /tmp/docker-cache
-      - run:
-          name: Verify
-          command: docker run --rm dlc-test:latest
+            echo "=== Docker version ==="
+            docker version --format '{{.Server.Version}}'
+            echo ""
+            echo "=== Storage Driver ==="
+            docker info --format '{{.Driver}}'
+            echo ""
+            echo "=== Full docker info (filtered) ==="
+            docker info 2>&1 | grep -iE 'storage|driver|snapshotter|containerd|overlay|backing|data-dir'
+            echo ""
+            echo "=== daemon.json ==="
+            cat /etc/docker/daemon.json 2>/dev/null || echo "(no daemon.json found)"
+            echo ""
+            echo "=== Docker data root ==="
+            docker info --format '{{.DockerRootDir}}'
+            echo ""
+            echo "=== /var/lib/docker contents ==="
+            ls -la /var/lib/docker/ 2>/dev/null | head -20
 
-  # Approach B: BuildKit inline cache — layer-level caching that works for incremental builds
-  approach-b-buildkit-inline:
+  check-storage-driver-28:
     machine:
-      image: ubuntu-2204:2026.05.1
+      image: ubuntu-2204:2025.09.1
       docker_layer_caching: false
     steps:
-      - checkout
       - run:
-          name: Docker version
-          command: docker version --format '{{.Server.Version}}'
-      - restore_cache:
-          keys:
-            - bk-cache-v1-{{ checksum "Dockerfile" }}
-            - bk-cache-v1-
-      - run:
-          name: Build with BuildKit cache
+          name: Docker info - storage driver (Docker 28)
           command: |
-            CACHE_DIR=/tmp/buildkit-cache
-            mkdir -p $CACHE_DIR
-            echo "=== Building with BuildKit local cache ==="
-            time docker build \
-              --cache-from type=local,src=$CACHE_DIR \
-              --cache-to type=local,dest=$CACHE_DIR,mode=max \
-              -t dlc-test:latest .
-            echo "=== Build complete ==="
-            docker images dlc-test
-      - save_cache:
-          key: bk-cache-v1-{{ checksum "Dockerfile" }}
-          paths:
-            - /tmp/buildkit-cache
-      - run:
-          name: Verify
-          command: docker run --rm dlc-test:latest
+            echo "=== Docker version ==="
+            docker version --format '{{.Server.Version}}'
+            echo ""
+            echo "=== Storage Driver ==="
+            docker info --format '{{.Driver}}'
+            echo ""
+            echo "=== Full docker info (filtered) ==="
+            docker info 2>&1 | grep -iE 'storage|driver|snapshotter|containerd|overlay|backing|data-dir'
+            echo ""
+            echo "=== daemon.json ==="
+            cat /etc/docker/daemon.json 2>/dev/null || echo "(no daemon.json found)"
 
 workflows:
   test:
     jobs:
-      - approach-a-save-load
-      - approach-b-buildkit-inline
+      - check-storage-driver
+      - check-storage-driver-28
