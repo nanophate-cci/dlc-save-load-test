@@ -1,27 +1,74 @@
 version: 2.1
 
 jobs:
-  clean-check:
+  docker29-dlc-on:
     machine:
       image: ubuntu-2204:2026.05.1
       docker_layer_caching: true
     steps:
       - run:
-          name: What does DLC + Docker 29 default to?
+          name: Docker 29 + DLC ON
           command: |
-            echo "=== daemon.json ==="
-            cat /etc/docker/daemon.json 2>/dev/null || echo "(does not exist)"
-            echo ""
+            echo "=== daemon.json ===" && cat /etc/docker/daemon.json 2>/dev/null || echo "(none)"
             echo "=== docker info ==="
-            docker info 2>&1 | grep -iE "storage driver|driver-type|backing|server version"
-            echo ""
-            echo "=== /var/lib/docker filesystem ==="
+            docker info 2>&1 | grep -iE "server version|storage driver|driver-type|backing"
+            echo "=== filesystem ==="
             df -Th /var/lib/docker
-            echo ""
-            echo "=== /var/lib/docker contents ==="
-            sudo ls -la /var/lib/docker/
+            echo "=== /var/lib/docker ==="
+            sudo ls /var/lib/docker/
+
+  docker29-dlc-off:
+    machine:
+      image: ubuntu-2204:2026.05.1
+      docker_layer_caching: false
+    steps:
+      - run:
+          name: Docker 29 + DLC OFF
+          command: |
+            echo "=== daemon.json ===" && cat /etc/docker/daemon.json 2>/dev/null || echo "(none)"
+            echo "=== docker info ==="
+            docker info 2>&1 | grep -iE "server version|storage driver|driver-type|backing"
+            echo "=== filesystem ==="
+            df -Th /var/lib/docker
+            echo "=== /var/lib/docker ==="
+            sudo ls /var/lib/docker/
+
+  docker28-dlc-on:
+    machine:
+      image: ubuntu-2204:2025.09.1
+      docker_layer_caching: true
+    steps:
+      - run:
+          name: Docker 28 + DLC ON
+          command: |
+            echo "=== daemon.json ===" && cat /etc/docker/daemon.json 2>/dev/null || echo "(none)"
+            echo "=== docker info ==="
+            docker info 2>&1 | grep -iE "server version|storage driver|driver-type|backing"
+            echo "=== filesystem ==="
+            df -Th /var/lib/docker
+            echo "=== /var/lib/docker ==="
+            sudo ls /var/lib/docker/
+
+  docker28-dlc-off:
+    machine:
+      image: ubuntu-2204:2025.09.1
+      docker_layer_caching: false
+    steps:
+      - run:
+          name: Docker 28 + DLC OFF
+          command: |
+            echo "=== daemon.json ===" && cat /etc/docker/daemon.json 2>/dev/null || echo "(none)"
+            echo "=== docker info ==="
+            docker info 2>&1 | grep -iE "server version|storage driver|driver-type|backing"
+            echo "=== filesystem ==="
+            df -Th /var/lib/docker
+            echo "=== /var/lib/docker ==="
+            sudo ls /var/lib/docker/
 
 workflows:
-  test:
+  compare:
     jobs:
-      - clean-check
+      - docker29-dlc-on
+      - docker29-dlc-off
+      - docker28-dlc-on
+      - docker28-dlc-off
