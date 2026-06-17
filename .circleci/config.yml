@@ -12,24 +12,26 @@ jobs:
           command: docker version
       - restore_cache:
           keys:
-            - docker-v1-{{ checksum "Dockerfile" }}
-            - docker-v1-
+            - docker-v2-{{ checksum "Dockerfile" }}
+            - docker-v2-
       - run:
           name: Load cached Docker image (if exists)
           command: |
             if [ -f /tmp/docker-cache/image.tar ]; then
-              echo "Cache found, loading..."
+              echo "Cache HIT — loading saved image for --cache-from"
               docker load < /tmp/docker-cache/image.tar
               echo "Loaded successfully"
               docker images
             else
-              echo "No cache found, will build from scratch"
+              echo "Cache MISS — will build from scratch"
             fi
       - run:
-          name: Build Docker image
+          name: Build Docker image (uses --cache-from if available)
           command: |
             echo "=== Building image ==="
-            time docker build -t dlc-test:latest .
+            DOCKER_BUILDKIT=1 time docker build \
+              --cache-from dlc-test:latest \
+              -t dlc-test:latest .
             echo "=== Build complete ==="
             docker images
       - run:
@@ -41,7 +43,7 @@ jobs:
             ls -lh /tmp/docker-cache/image.tar
             echo "=== Save complete ==="
       - save_cache:
-          key: docker-v1-{{ checksum "Dockerfile" }}
+          key: docker-v2-{{ checksum "Dockerfile" }}
           paths:
             - /tmp/docker-cache
       - run:
