@@ -1,74 +1,82 @@
 version: 2.1
 
 jobs:
-  docker29-dlc-on:
-    machine:
-      image: ubuntu-2204:2026.05.1
-      docker_layer_caching: true
-    steps:
-      - run:
-          name: Docker 29 + DLC ON
-          command: |
-            echo "=== daemon.json ===" && cat /etc/docker/daemon.json 2>/dev/null || echo "(none)"
-            echo "=== docker info ==="
-            docker info 2>&1 | grep -iE "server version|storage driver|driver-type|backing"
-            echo "=== filesystem ==="
-            df -Th /var/lib/docker
-            echo "=== /var/lib/docker ==="
-            sudo ls /var/lib/docker/
-
-  docker29-dlc-off:
+  docker29-layers:
     machine:
       image: ubuntu-2204:2026.05.1
       docker_layer_caching: false
     steps:
+      - checkout
       - run:
-          name: Docker 29 + DLC OFF
+          name: Build an image then show where layers are stored
           command: |
-            echo "=== daemon.json ===" && cat /etc/docker/daemon.json 2>/dev/null || echo "(none)"
+            docker build -t dlc-test:latest .
+            echo ""
             echo "=== docker info ==="
-            docker info 2>&1 | grep -iE "server version|storage driver|driver-type|backing"
-            echo "=== filesystem ==="
-            df -Th /var/lib/docker
-            echo "=== /var/lib/docker ==="
-            sudo ls /var/lib/docker/
+            docker info --format 'Storage Driver: {{.Driver}}'
+            echo ""
+            echo "=== /var/lib/docker top-level ==="
+            sudo ls -la /var/lib/docker/
+            echo ""
+            echo "=== /var/lib/docker tree (depth 2) ==="
+            sudo find /var/lib/docker -maxdepth 2 -type d | sort
+            echo ""
+            echo "=== overlay2 dir? ==="
+            sudo ls /var/lib/docker/overlay2/ 2>/dev/null || echo "(does not exist)"
+            echo ""
+            echo "=== containerd content/snapshotter dirs? ==="
+            sudo find /var/lib/docker -path "*containerd*" -maxdepth 4 -type d 2>/dev/null | sort || echo "(none)"
+            sudo find /var/lib/docker -path "*snapshotter*" -maxdepth 4 -type d 2>/dev/null | sort || echo "(none)"
+            sudo find /var/lib/docker -path "*snapshots*" -maxdepth 4 -type d 2>/dev/null | sort || echo "(none)"
+            echo ""
+            echo "=== image store ==="
+            sudo find /var/lib/docker/image -maxdepth 3 -type d 2>/dev/null | sort
+            echo ""
+            echo "=== buildkit content ==="
+            sudo find /var/lib/docker/buildkit -maxdepth 3 -type d 2>/dev/null | sort
+            echo ""
+            echo "=== disk usage breakdown ==="
+            sudo du -sh /var/lib/docker/*/ 2>/dev/null | sort -rh
 
-  docker28-dlc-on:
-    machine:
-      image: ubuntu-2204:2025.09.1
-      docker_layer_caching: true
-    steps:
-      - run:
-          name: Docker 28 + DLC ON
-          command: |
-            echo "=== daemon.json ===" && cat /etc/docker/daemon.json 2>/dev/null || echo "(none)"
-            echo "=== docker info ==="
-            docker info 2>&1 | grep -iE "server version|storage driver|driver-type|backing"
-            echo "=== filesystem ==="
-            df -Th /var/lib/docker
-            echo "=== /var/lib/docker ==="
-            sudo ls /var/lib/docker/
-
-  docker28-dlc-off:
+  docker28-layers:
     machine:
       image: ubuntu-2204:2025.09.1
       docker_layer_caching: false
     steps:
+      - checkout
       - run:
-          name: Docker 28 + DLC OFF
+          name: Build an image then show where layers are stored
           command: |
-            echo "=== daemon.json ===" && cat /etc/docker/daemon.json 2>/dev/null || echo "(none)"
+            docker build -t dlc-test:latest .
+            echo ""
             echo "=== docker info ==="
-            docker info 2>&1 | grep -iE "server version|storage driver|driver-type|backing"
-            echo "=== filesystem ==="
-            df -Th /var/lib/docker
-            echo "=== /var/lib/docker ==="
-            sudo ls /var/lib/docker/
+            docker info --format 'Storage Driver: {{.Driver}}'
+            echo ""
+            echo "=== /var/lib/docker top-level ==="
+            sudo ls -la /var/lib/docker/
+            echo ""
+            echo "=== /var/lib/docker tree (depth 2) ==="
+            sudo find /var/lib/docker -maxdepth 2 -type d | sort
+            echo ""
+            echo "=== overlay2 dir? ==="
+            sudo ls /var/lib/docker/overlay2/ 2>/dev/null || echo "(does not exist)"
+            echo ""
+            echo "=== containerd content/snapshotter dirs? ==="
+            sudo find /var/lib/docker -path "*containerd*" -maxdepth 4 -type d 2>/dev/null | sort || echo "(none)"
+            sudo find /var/lib/docker -path "*snapshotter*" -maxdepth 4 -type d 2>/dev/null | sort || echo "(none)"
+            sudo find /var/lib/docker -path "*snapshots*" -maxdepth 4 -type d 2>/dev/null | sort || echo "(none)"
+            echo ""
+            echo "=== image store ==="
+            sudo find /var/lib/docker/image -maxdepth 3 -type d 2>/dev/null | sort
+            echo ""
+            echo "=== buildkit content ==="
+            sudo find /var/lib/docker/buildkit -maxdepth 3 -type d 2>/dev/null | sort
+            echo ""
+            echo "=== disk usage breakdown ==="
+            sudo du -sh /var/lib/docker/*/ 2>/dev/null | sort -rh
 
 workflows:
-  compare:
+  compare-layers:
     jobs:
-      - docker29-dlc-on
-      - docker29-dlc-off
-      - docker28-dlc-on
-      - docker28-dlc-off
+      - docker29-layers
+      - docker28-layers
