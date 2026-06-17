@@ -1,0 +1,54 @@
+version: 2.1
+
+jobs:
+  build-with-save-load-cache:
+    machine:
+      image: ubuntu-2204:2026.05.1
+      docker_layer_caching: false
+    steps:
+      - checkout
+      - run:
+          name: Show Docker version
+          command: docker version
+      - restore_cache:
+          keys:
+            - docker-v1-{{ checksum "Dockerfile" }}
+            - docker-v1-
+      - run:
+          name: Load cached Docker image (if exists)
+          command: |
+            if [ -f /tmp/docker-cache/image.tar ]; then
+              echo "Cache found, loading..."
+              docker load < /tmp/docker-cache/image.tar
+              echo "Loaded successfully"
+              docker images
+            else
+              echo "No cache found, will build from scratch"
+            fi
+      - run:
+          name: Build Docker image
+          command: |
+            echo "=== Building image ==="
+            time docker build -t dlc-test:latest .
+            echo "=== Build complete ==="
+            docker images
+      - run:
+          name: Save Docker image for cache
+          command: |
+            mkdir -p /tmp/docker-cache
+            echo "=== Saving image ==="
+            time docker save dlc-test:latest > /tmp/docker-cache/image.tar
+            ls -lh /tmp/docker-cache/image.tar
+            echo "=== Save complete ==="
+      - save_cache:
+          key: docker-v1-{{ checksum "Dockerfile" }}
+          paths:
+            - /tmp/docker-cache
+      - run:
+          name: Verify image works
+          command: docker run --rm dlc-test:latest
+
+workflows:
+  test:
+    jobs:
+      - build-with-save-load-cache
