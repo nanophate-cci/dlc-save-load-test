@@ -1,54 +1,37 @@
 version: 2.1
 
 jobs:
-  check-storage-driver:
+  # Test: can user force overlay2 on Docker 29 and keep DLC working?
+  force-overlay2-with-dlc:
     machine:
       image: ubuntu-2204:2026.05.1
-      docker_layer_caching: false
+      docker_layer_caching: true
     steps:
+      - checkout
       - run:
-          name: Docker info - storage driver
+          name: Check storage driver BEFORE change
           command: |
-            echo "=== Docker version ==="
-            docker version --format '{{.Server.Version}}'
-            echo ""
-            echo "=== Storage Driver ==="
-            docker info --format '{{.Driver}}'
-            echo ""
-            echo "=== Full docker info (filtered) ==="
-            docker info 2>&1 | grep -iE 'storage|driver|snapshotter|containerd|overlay|backing|data-dir'
-            echo ""
-            echo "=== daemon.json ==="
-            cat /etc/docker/daemon.json 2>/dev/null || echo "(no daemon.json found)"
-            echo ""
-            echo "=== Docker data root ==="
-            docker info --format '{{.DockerRootDir}}'
-            echo ""
-            echo "=== /var/lib/docker contents ==="
-            ls -la /var/lib/docker/ 2>/dev/null | head -20
-
-  check-storage-driver-28:
-    machine:
-      image: ubuntu-2204:2025.09.1
-      docker_layer_caching: false
-    steps:
+            echo "=== Before ==="
+            docker info --format 'Storage Driver: {{.Driver}}'
+            docker info 2>&1 | grep -i "driver-type" || true
       - run:
-          name: Docker info - storage driver (Docker 28)
+          name: Force overlay2 storage driver
           command: |
-            echo "=== Docker version ==="
-            docker version --format '{{.Server.Version}}'
-            echo ""
-            echo "=== Storage Driver ==="
-            docker info --format '{{.Driver}}'
-            echo ""
-            echo "=== Full docker info (filtered) ==="
-            docker info 2>&1 | grep -iE 'storage|driver|snapshotter|containerd|overlay|backing|data-dir'
-            echo ""
-            echo "=== daemon.json ==="
-            cat /etc/docker/daemon.json 2>/dev/null || echo "(no daemon.json found)"
+            echo '{"storage-driver": "overlay2"}' | sudo tee /etc/docker/daemon.json
+            sudo systemctl restart docker
+            echo "=== After restart ==="
+            docker info --format 'Storage Driver: {{.Driver}}'
+            docker info 2>&1 | grep -iE "driver-type|Backing" || true
+      - run:
+          name: Build Docker image
+          command: |
+            docker build -t dlc-test:latest .
+            docker images dlc-test
+      - run:
+          name: Verify
+          command: docker run --rm dlc-test:latest
 
 workflows:
   test:
     jobs:
-      - check-storage-driver
-      - check-storage-driver-28
+      - force-overlay2-with-dlc
